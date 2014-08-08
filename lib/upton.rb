@@ -76,7 +76,7 @@ module Upton
 
       # If true, then Upton prints information about when it gets
       # files from the internet and when it gets them from its stash.
-      @verbose = false
+      @verbose = true
 
       # If true, then Upton fetches each instance page only once
       # future requests for that file are responded to with the locally stashed
@@ -91,7 +91,7 @@ module Upton
 
       # In order to not hammer servers, Upton waits for, by default, 30
       # seconds between requests to the remote server.
-      @sleep_time_between_requests = 30 #seconds
+      @sleep_time_between_requests = 5 #seconds
 
       # If true, then Upton will attempt to scrape paginated index pages
       @paginated = false
