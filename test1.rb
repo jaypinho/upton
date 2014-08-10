@@ -1,16 +1,9 @@
 require './lib/upton'
 
-#u = Upton::Scraper.new("http://cityroom.blogs.nytimes.com/category/metropolitan-diary/", :css)
-#u.scrape_to_csv("output.csv", &Upton::Utils.list("h3.entry-title", :css))
+require 'date'
 
-#u = Upton::Scraper.new("http://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml")
-#u.scrape_to_csv("output.csv", &Upton::Utils.list("item title"))
+scraper = Upton::Scraper.new("http://www.oyez.org/cases?page=139&order=field_argument_value&sort=asc", "table.views-table td.views-field-title a")
 
-
-# scraper = Upton::Scraper.new("http://www.oyez.org/cases?page=97&order=field_argument_value&sort=asc", "tr.views-row-first td.views-field-title a")
-scraper = Upton::Scraper.new("http://www.oyez.org/cases?page=95&order=field_argument_value&sort=asc", "table.views-table td.views-field-title a")
-puts "DONE DONE DONE DONE"
-# scraper.scrape_to_tsv "trying15.tsv" do |x|
 scraper.scrape do |x|
 
 	case_str = ""
@@ -22,9 +15,6 @@ scraper.scrape do |x|
 	dec_date = nil
 	transcript_str = ""
 	recusal_str = ""
-
-
-	# Nokogiri::HTML(x).search("#transcript-text55274").map &:text
 
 	case_str = (Nokogiri::HTML(x).css('head title').map &:text)[0]
 	unless case_str.nil?
@@ -63,33 +53,80 @@ scraper.scrape do |x|
 
 	arg_date = (Nokogiri::HTML(x).css('div#details div.field-field-argument span.date-display-single').map &:text)[0]
 	unless arg_date.nil?
-		arg_date = arg_date.strip
+		arg_date = DateTime.parse(arg_date.strip).strftime('%Y-%m-%d')
 	else
 		arg_date = ""
 	end
 
 	dec_date = (Nokogiri::HTML(x).css('div#details div.field-field-decision span.date-display-single').map &:text)[0]
 	unless dec_date.nil?
-		dec_date = dec_date.strip
+		dec_date = DateTime.parse(dec_date.strip).strftime('%Y-%m-%d')
 	else
 		dec_date = ""
 	end
 
-	transcript_str = (Nokogiri::HTML(x).css('div[id^=transcript-text]').map &:text)[0]
-	unless transcript_str.nil?
-		transcript_str = transcript_str.gsub(/[.\s\S]*Transcript:[\s\n\W]*/, '').strip.gsub(/\n/, "\n\n").strip
-	else
-		transcript_str = ""
+	args_array = Array.new
+	(Nokogiri::HTML(x).css('div.media-player-container')).each do |z|
+
+		z.css('div.media-player').map{|a| a['rel']}.each do |f|
+
+			if f.include? "argument"
+			correct_id = z.css('a.attachment.fancybox').map{|b| b['href']}[0]
+			args_array << correct_id[1..correct_id.length]
+			end
+
+		end
+
 	end
 
-	# puts (Nokogiri::HTML(x).css('head title').map &:text)[0].strip.gsub(' | The Oyez Project at IIT Chicago-Kent College of Law', '')
-	# puts (Nokogiri::HTML(x).css('div#details div.field-field-docket div.field-item').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div#details div.field-field-petitioner div.field-item').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div#details div.field-field-respondent div.field-item').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div.case-term div.item-list li.first a').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div#details div.field-field-argument span.date-display-single').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div#details div.field-field-decision span.date-display-single').map &:text)[0].strip
-	# puts (Nokogiri::HTML(x).css('div[id^=transcript-text]').map &:text)[0].gsub(/[.\s\S]*Transcript:[\s\n\W]*/, '').strip.gsub(/\n/, "\n\n").strip
+	transcript_count = 0
+	args_array.each do |k|
+		transcript_count += 1
+		div_name = "div#" + k
+		y = (Nokogiri::HTML(x).css(div_name).map &:text)[0]
+		unless y.nil?
+			y = y.gsub(/[.\s\S]*Transcript:[\s\n\W]*/, '').strip.gsub(/\n/, "\n\n").strip
+		else
+			y = ""
+		end
+		if transcript_count > 1 and y != ""
+			transcript_str = transcript_str + "\n\n--\n\n" + y
+		elsif transcript_count > 1 and y == ""
+		else
+			transcript_str = y
+		end
+	end
+
+
+
+
+
+	# (Nokogiri::HTML(x).css('div[id^=transcript-text]').map &:text).each do |y|
+	# 	transcript_count += 1
+	# 	unless y.nil?
+	# 		y = y.gsub(/[.\s\S]*Transcript:[\s\n\W]*/, '').strip.gsub(/\n/, "\n\n").strip
+	# 	else
+	# 		y = ""
+	# 	end
+	# 	if transcript_count > 1
+	# 		transcript_str = transcript_str + "\n\n--\n\n" + y
+	# 	else
+	# 		transcript_str = y
+	# 	end
+	# end
+
+
+
+
+
+
+
+	# transcript_str = (Nokogiri::HTML(x).css('div[id^=transcript-text]').map &:text)[0]
+	# unless transcript_str.nil?
+	# 	transcript_str = transcript_str.gsub(/[.\s\S]*Transcript:[\s\n\W]*/, '').strip.gsub(/\n/, "\n\n").strip
+	# else
+	# 	transcript_str = ""
+	# end
 
 	Nokogiri::HTML(x).css('div.block div.item-list ul.case-decision li.na span.justice-icon img').map{ |x| x['title'] }.each do |y|
 	
@@ -106,42 +143,9 @@ scraper.scrape do |x|
 	puts petitioner_str
 	puts respondent_str
 	puts term_int.to_s
-	puts arg_date
-	puts dec_date
+	puts arg_date.to_s
+	puts dec_date.to_s
 	puts transcript_str
 	puts recusal_str
 
 end
-
-  # puts &Upton::Utils.list("div#transcript-text83210")
-
-
-
-
-
-
-# scraper = Upton::Scraper.new("http://www.oyez.org/cases?order=field_argument_value&sort=asc", ".compact-list a.title-link")
-# scraper.paginated = true
-# scraper.pagination_param = 'page'
-# scraper.pagination_max_pages = 1
-# scraper.scrape_to_csv("cases.csv", &Upton::Utils.list("h2"))
-# end
-
-
-
-
-
-
-# scraper = Upton::Scraper.new("http://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "item link")
-# scraper.scrape do |article_html_string|
-#   scraper.scrape_to_csv("output.csv", &Upton::Utils.list("article.story"))
-#   #or, do other stuff here.
-# end
-
-
-# scraper = Upton::Scraper.new("http://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "item link")
-# scraper.scrape do |article_html_string|
-#   puts "here is the full html content of the ProPublica article listed on the homepage: "
-#   puts "#{article_html_string}"
-#   #or, do other stuff here.
-# end
